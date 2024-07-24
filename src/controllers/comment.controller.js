@@ -98,4 +98,41 @@ const getPostComments = asyncHandler(async (req, res) => {
     )
 })
 
-export { addComment, deleteComment, getPostComments }
+// like comments
+const likeComments = asyncHandler(async (req, res) => {
+    const { postId, commentId } = req.params;
+    const {flag} = req.body;
+
+    if (!(commentId)) {
+        throw new ApiError(400, "CommentId is required!");
+    }
+
+    const post = await Post.findById(postId)
+    if (!post) {
+        throw new ApiError(404, "Post does not exist!");
+    }
+
+    const comment = await Comment.findById(commentId)
+    if(!comment) {
+        throw new ApiError(404, "Comment does not exist!");
+    }
+
+    if(flag && !comment.likes?.includes(req.user._id)) {
+        comment.likes.push(req.user._id);
+        await comment.save({validateBeforeSave: false, new: true})
+    } else if(flag && comment.likes?.includes(req.user?._id)) {
+        const index = comment.likes.indexOf(req.user._id);
+        comment.likes.splice(index, 1);
+        await comment.save({validateBeforeSave: false, new: true})
+    }
+
+    return res.status(200).json(
+        new ApiResponse(200, comment, "Post comment updated successfully!")
+    )
+
+
+
+
+})
+
+export { addComment, deleteComment, getPostComments, likeComments }
