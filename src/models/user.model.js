@@ -1,6 +1,7 @@
 import mongoose, {Schema} from 'mongoose';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import {AvailableRoles, UserRolesEnum} from "../constants/constants.js";
 
 const UserSchema = new Schema({
     username: {
