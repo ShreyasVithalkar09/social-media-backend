@@ -81,9 +81,47 @@ const getUserPosts = asyncHandler(async (req, res) => {
     throw new ApiError(404, "User not found!");
   }
 
-  const posts = await Post.find({
-    owner: user?._id,
-  });
+  const posts = await Post.aggregate([
+    {
+      $match: {
+        owner: user?._id,
+      },
+    },
+    {
+      $lookup: {
+        from: "users",
+        localField: "owner",
+        foreignField: "_id",
+        as: "postedBy",
+      },
+    },
+    {
+      $addFields: {
+        postedBy: {
+          $arrayElemAt: ["$postedBy", 0],
+        },
+        totalLikes: {
+          $size: "$likes",
+        },
+        totalComments: {
+          $size: "$comments",
+        },
+      },
+    },
+    {
+      $project: {
+        _id: 1,
+        message: 1,
+        totalLikes: 1,
+        totalComments: 1,
+        "postedBy.fullName": 1,
+        "postedBy.username": 1,
+        "postedBy.avatar.url": 1,
+        createdAt: 1,
+        updatedAt: 1,
+      },
+    },
+  ]);
 
   if (!posts) {
     throw new ApiError(500, "Something went wrong! or Create a post!");
