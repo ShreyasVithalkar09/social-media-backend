@@ -4,7 +4,7 @@ import {
     createPost,
     deletePost,
     getPosts,
-    getPostsByUserId,
+    getUserPosts,
     likePost,
     updatePost
 } from "../controllers/post.controller.js";
@@ -15,7 +15,7 @@ const router = new Router();
 router.use(verifyJwtToken) // applies for all requests
 
 router.route("/").post(createPost).get(getPosts)
-router.route("/user-posts").get(getPostsByUserId)
+router.route("/:username").get(getUserPosts)
 router.route("/:postId").delete(deletePost).put(updatePost)
 router.route("/:postId/like").patch(likePost)
 router.route("/:postId/comments").post(addComment).get(getPostComments)

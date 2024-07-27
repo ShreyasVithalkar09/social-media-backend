@@ -3,6 +3,7 @@ import {ApiError} from "../utils/ApiError.js";
 import {ApiResponse} from "../utils/ApiResponse.js";
 import {Post} from "../models/post.model.js";
 import {Comment} from "../models/comment.model.js";
+import { User } from "../models/user.model.js";
 
 // create post
 const createPost = asyncHandler(async (req, res) => {
@@ -40,9 +41,17 @@ const getPosts = asyncHandler(async (req, res) => {
 })
 
 // get posts by user
-const getPostsByUserId = asyncHandler(async (req, res) => {
+const getUserPosts = asyncHandler(async (req, res) => {
+    const { username } = req.params;
+
+   const user = await User.findOne({ username })
+
+    if(!user) {
+        throw new ApiError(404, "User not found!");
+    }
+
     const posts = await Post.find({
-        owner: req.user?._id,
+        owner: user?._id,
     })
 
     if (!posts) {
@@ -161,4 +170,4 @@ const likePost = asyncHandler(async (req, res) => {
 
 })
 
-export {createPost, getPosts, getPostsByUserId, deletePost, updatePost, likePost}
+export {createPost, getPosts, getUserPosts, deletePost, updatePost, likePost}
