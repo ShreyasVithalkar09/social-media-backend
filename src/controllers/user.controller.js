@@ -25,6 +25,61 @@ const generateAccessRefreshToken = async (userId) => {
   }
 };
 
+const getUserProfile = async (userId) => {
+  const user = await User.findById(userId);
+
+  if (!user) {
+    throw new ApiError(404, "User does not exist!");
+  }
+
+  const userProfile = await User.aggregate([
+    {
+      $match: {
+        _id: new mongoose.Types.ObjectId(userId),
+      },
+    },
+    {
+      $lookup: {
+        from: "posts",
+        localField: "_id",
+        foreignField: "owner",
+        as: "user_posts",
+      },
+    },
+    {
+      $addFields: {
+        postsCount: {
+          $size: "$user_posts",
+        },
+        followersCount: {
+          $size: "$followers",
+        },
+        followingCount: {
+          $size: "$following",
+        },
+      },
+    },
+    {
+      $project: {
+        _id: 1,
+        username: 1,
+        fullName: 1,
+        "avatar.url": 1,
+        postsCount: 1,
+        followersCount: 1,
+        followingCount: 1,
+        user_posts: 1,
+      },
+    },
+  ]);
+
+  if (!userProfile[0]) {
+    throw new ApiError(404, "User profile does not exist!");
+  }
+  return userProfile[0];
+};
+
+// register user
 const registerUser = asyncHandler(async (req, res, next) => {
   const { username, email, password, fullName } = req.body;
 
@@ -86,6 +141,7 @@ const registerUser = asyncHandler(async (req, res, next) => {
     );
 });
 
+// login
 const loginUser = asyncHandler(async (req, res, next) => {
   const { email, username, password } = req.body;
 
@@ -138,58 +194,43 @@ const loginUser = asyncHandler(async (req, res, next) => {
     );
 });
 
-const getUserProfile = asyncHandler(async (req, res) => {
-  const { userId } = req.params;
+// get profile by username
+const getUserProfileByUsername = asyncHandler(async (req, res) => {
+  const { username } = req.params;
 
-  const user = await User.aggregate([
-    {
-      $match: {
-        _id: new mongoose.Types.ObjectId(userId),
-      },
-    },
-    {
-      $lookup: {
-        from: "posts",
-        localField: "_id",
-        foreignField: "owner",
-        as: "user_posts",
-      },
-    },
-    {
-      $addFields: {
-        postsCount: {
-          $size: "$user_posts",
-        },
-        followersCount: {
-          $size: "$followers",
-        },
-        followingCount: {
-          $size: "$following",
-        },
-      },
-    },
-    {
-      $project: {
-        _id: 1,
-        username: 1,
-        fullName: 1,
-        "avatar.url": 1,
-        postsCount: 1,
-        followersCount: 1,
-        followingCount: 1,
-        user_posts: 1,
-      },
-    },
-  ]);
+  const user = await User.findOne({ username });
 
-  if (!user || user.length === 0) {
+  if (!user) {
     throw new ApiError(404, "User not found!");
   }
+
+  const userProfile = await getUserProfile(user._id);
+
   return res
     .status(200)
-    .json(new ApiResponse(200, user, "User fetched successfully!"));
+    .json(
+      new ApiResponse(200, userProfile, "User-profile fetched successfully!")
+    );
 });
 
+// get my profile
+const getMyProfile = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id);
+
+  if (!user) {
+    throw new ApiError(404, "User not found!");
+  }
+
+  const userProfile = await getUserProfile(req.user._id);
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, userProfile, "User-profile fetched successfully!")
+    );
+});
+
+// logout
 const logoutUser = asyncHandler(async (req, res) => {
   await User.findByIdAndUpdate(
     req.user?._id,
@@ -215,11 +256,10 @@ const logoutUser = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, {}, "User logged Out successfully!"));
 });
 
-
 export {
   registerUser,
   loginUser,
-  getUserProfile,
+  getUserProfileByUsername,
   logoutUser,
-
+  getMyProfile,
 };

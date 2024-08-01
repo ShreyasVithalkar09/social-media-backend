@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { verifyJwtToken } from "../middlewares/auth.middleware.js";
 import {
-  getUserProfile,
+  getMyProfile,
+  getUserProfileByUsername,
   loginUser,
   logoutUser,
   registerUser,
@@ -17,6 +18,9 @@ router.route("/login").post(loginUser);
 
 // secured routes
 router.route("/logout").post(verifyJwtToken, logoutUser);
-router.route("/:userId").get(verifyJwtToken, getUserProfile);
+router
+  .route("/profile/:username")
+  .get(verifyJwtToken, getUserProfileByUsername);
+router.route("/profile/get/me").get(verifyJwtToken, getMyProfile);
 
 export default router;
