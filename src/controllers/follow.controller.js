@@ -20,6 +20,13 @@ const getFollowersList = asyncHandler(async (req, res) => {
       },
     },
     {
+      $addFields: {
+        totalFollowers: {
+          $size: "$followers"
+        }
+      }
+    },
+    {
       $lookup: {
         from: "users",
         let: { followerIds: "$followers" },
@@ -55,6 +62,7 @@ const getFollowersList = asyncHandler(async (req, res) => {
       $project: {
         _id: 0,
         followerDetails: 1,
+        totalFollowers: 1
       },
     },
   ]);
