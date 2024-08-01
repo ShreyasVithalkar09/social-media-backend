@@ -4,6 +4,7 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import { Post } from "../models/post.model.js";
 import { Comment } from "../models/comment.model.js";
 import { User } from "../models/user.model.js";
+import mongoose from "mongoose";
 
 // create post
 const createPost = asyncHandler(async (req, res) => {
@@ -132,6 +133,61 @@ const getUserPosts = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, posts, "Posts fetched successfully!"));
 });
 
+// get a post
+const getPostById = asyncHandler(async (req, res) => {
+  const { postId } = req.params;
+
+  const post = await Post.aggregate([
+    {
+      $match: {
+        _id: new mongoose.Types.ObjectId(postId),
+      },
+    },
+    {
+      $lookup: {
+        from: "users",
+        localField: "owner",
+        foreignField: "_id",
+        as: "postedBy",
+      },
+    },
+    {
+      $addFields: {
+        postedBy: {
+          $arrayElemAt: ["$postedBy", 0],
+        },
+        totalLikes: {
+          $size: "$likes",
+        },
+        totalComments: {
+          $size: "$comments",
+        },
+      },
+    },
+    {
+      $project: {
+        _id: 1,
+        message: 1,
+        totalLikes: 1,
+        totalComments: 1,
+        "postedBy.fullName": 1,
+        "postedBy.username": 1,
+        "postedBy.avatar.url": 1,
+        createdAt: 1,
+        updatedAt: 1,
+      },
+    },
+  ]);
+
+  if (!post[0]) {
+    throw new ApiError(404, "Post not found!");
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, post[0], "Post fetched successfully!"));
+});
+
 // delete post
 const deletePost = asyncHandler(async (req, res) => {
   const { postId } = req.params;
@@ -231,4 +287,12 @@ const likePost = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, post, "Post updated successfully!"));
 });
 
-export { createPost, getPosts, getUserPosts, deletePost, updatePost, likePost };
+export {
+  createPost,
+  getPosts,
+  getUserPosts,
+  deletePost,
+  updatePost,
+  likePost,
+  getPostById,
+};
