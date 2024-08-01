@@ -5,9 +5,9 @@ import { User } from "../models/user.model.js";
 import mongoose from "mongoose";
 
 const getFollowersList = asyncHandler(async (req, res) => {
-  const { userId } = req.params;
+  const { username } = req.params;
 
-  const user = await User.findById(userId);
+  const user = await User.findOne({ username });
 
   if (!user) {
     throw new ApiError(404, "User not found!");
@@ -16,15 +16,15 @@ const getFollowersList = asyncHandler(async (req, res) => {
   const followersList = await User.aggregate([
     {
       $match: {
-        _id: new mongoose.Types.ObjectId(userId),
+        username: username.toLowerCase(),
       },
     },
     {
       $addFields: {
         totalFollowers: {
-          $size: "$followers"
-        }
-      }
+          $size: "$followers",
+        },
+      },
     },
     {
       $lookup: {
@@ -51,7 +51,7 @@ const getFollowersList = asyncHandler(async (req, res) => {
             $project: {
               username: 1,
               fullName: 1,
-              avatar: 1,
+              "avatar.url": 1,
             },
           },
         ],
@@ -62,7 +62,7 @@ const getFollowersList = asyncHandler(async (req, res) => {
       $project: {
         _id: 0,
         followerDetails: 1,
-        totalFollowers: 1
+        totalFollowers: 1,
       },
     },
   ]);
@@ -78,13 +78,87 @@ const getFollowersList = asyncHandler(async (req, res) => {
     );
 });
 
+const getFollowingsList = asyncHandler(async (req, res) => {
+  const { username } = req.params;
+
+  const user = await User.findOne({ username });
+
+  if (!user) {
+    throw new ApiError(404, "User not found!");
+  }
+
+  const followingList = await User.aggregate([
+    {
+      $match: {
+        username: username.toLowerCase(),
+      },
+    },
+    {
+      $addFields: {
+        totalFollowings: {
+          $size: "$following",
+        },
+      },
+    },
+    {
+      $lookup: {
+        from: "users",
+        let: { followingIds: "$following" },
+        pipeline: [
+          {
+            $match: {
+              $expr: {
+                $in: [
+                  "$_id",
+                  {
+                    $map: {
+                      input: "$$followingIds",
+                      as: "id",
+                      in: { $toObjectId: "$$id" },
+                    },
+                  },
+                ],
+              },
+            },
+          },
+          {
+            $project: {
+              username: 1,
+              fullName: 1,
+              "avatar.url": 1,
+            },
+          },
+        ],
+        as: "followingDetails",
+      },
+    },
+    {
+      $project: {
+        _id: 0,
+        followingDetails: 1,
+        totalFollowings: 1,
+      },
+    },
+  ]);
+
+  if (!followingList[0]) {
+    throw new ApiError(404, "Followings not found");
+  }
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, followingList[0], "Followings fetched successfully!")
+    );
+});
+
 const followUnfollowUser = asyncHandler(async (req, res) => {
   // bring the id of user you want to follow
   // check if user exists
   // Then check if user id you want to follow !== logged in user (user cannot follow self)
   // check if user is already following, if no then push data else remove
 
-  const { userId } = req.params;
+  const { userId } = req.params; // id of user you want to follow
 
   const userToFollow = await User.findById(userId);
   const currentUser = await User.findById(req.user?._id);
@@ -97,11 +171,13 @@ const followUnfollowUser = asyncHandler(async (req, res) => {
     throw new ApiError(400, "User cannot follow self!");
   }
 
-  const isFollowing = currentUser.following.includes(userId);
+
+  const isFollowing = userToFollow.followers.includes(req.user._id); 
   let followStatus;
 
   try {
-    if (isFollowing) {
+    // if true, then you are already following the user
+    if (isFollowing) { 
       await User.findByIdAndUpdate(userId, {
         $pull: { followers: req.user._id },
       });
@@ -143,4 +219,4 @@ const followUnfollowUser = asyncHandler(async (req, res) => {
     );
 });
 
-export { getFollowersList, followUnfollowUser };
+export { getFollowersList, followUnfollowUser, getFollowingsList };
