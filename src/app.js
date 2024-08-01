@@ -4,6 +4,7 @@ import cookieParser from "cookie-parser"
 import {API_VERSION} from "./constants/constants.js";
 import userRoutes from "./routes/user.routes.js";
 import postRoutes from "./routes/post.route.js";
+import followRoutes from "./routes/follow.route.js";
 
 const app = express();
 
@@ -26,6 +27,7 @@ app.use(cookieParser());
 // route declarations
 app.use(`/api/${API_VERSION}/users`, userRoutes)
 app.use(`/api/${API_VERSION}/posts`, postRoutes)
+app.use(`/api/${API_VERSION}/users/follow`, followRoutes)
 
 
 // test route
