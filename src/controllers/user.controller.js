@@ -3,6 +3,7 @@ import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { User } from "../models/user.model.js";
 import { uploadToCloudinary } from "../utils/cloudinary.js";
+import mongoose from "mongoose";
 
 // generate access and refresh token
 const generateAccessRefreshToken = async (userId) => {
@@ -137,10 +138,53 @@ const loginUser = asyncHandler(async (req, res, next) => {
     );
 });
 
-const getCurrentUser = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.user?._id).select(
-    "-password -refreshToken"
-  );
+const getUserProfile = asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+
+  const user = await User.aggregate([
+    {
+      $match: {
+        _id: new mongoose.Types.ObjectId(userId),
+      },
+    },
+    {
+      $lookup: {
+        from: "posts",
+        localField: "_id",
+        foreignField: "owner",
+        as: "user_posts",
+      },
+    },
+    {
+      $addFields: {
+        postsCount: {
+          $size: "$user_posts",
+        },
+        followersCount: {
+          $size: "$followers",
+        },
+        followingCount: {
+          $size: "$following",
+        },
+      },
+    },
+    {
+      $project: {
+        _id: 1,
+        username: 1,
+        fullName: 1,
+        "avatar.url": 1,
+        postsCount: 1,
+        followersCount: 1,
+        followingCount: 1,
+        user_posts: 1,
+      },
+    },
+  ]);
+
+  if (!user || user.length === 0) {
+    throw new ApiError(404, "User not found!");
+  }
   return res
     .status(200)
     .json(new ApiResponse(200, user, "User fetched successfully!"));
@@ -171,4 +215,11 @@ const logoutUser = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, {}, "User logged Out successfully!"));
 });
 
-export { registerUser, loginUser, getCurrentUser, logoutUser };
+
+export {
+  registerUser,
+  loginUser,
+  getUserProfile,
+  logoutUser,
+
+};
