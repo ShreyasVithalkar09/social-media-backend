@@ -59,6 +59,16 @@ UserSchema.pre("save", async function (next) {
   next();
 });
 
+// set the default avatar if not provided
+UserSchema.pre("save", async function (next) {
+  if (!this.isModified("avatar.url")) return next();
+
+  if (this.avatar.url === null || this.avatar.url === "") {
+    this.avatar.url = `https://avatar.iran.liara.run/username?username=${this.username}`;
+  }
+  next();
+});
+
 // validate password
 UserSchema.methods.isPasswordValid = async function (password) {
   return await bcrypt.compare(password, this.password);
