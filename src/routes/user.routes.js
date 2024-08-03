@@ -5,6 +5,7 @@ import {
   getUserProfileByUsername,
   loginUser,
   logoutUser,
+  refreshAccessToken,
   registerUser,
   removeAvatar,
   updateAvatar,
@@ -32,5 +33,6 @@ router
   .route("/profile/me/avatar")
   .patch(verifyJwtToken, upload.single("avatar"), updateAvatar)
   .delete(verifyJwtToken, removeAvatar)
+router.route("/refresh-token").post(verifyJwtToken, refreshAccessToken);
 
 export default router;

@@ -37,6 +37,12 @@ const UserSchema = new Schema(
         type: String,
       },
     },
+    bio: {
+      type: String,
+      min: [2, "Bio must be minimum two characters"],
+      max: [180, "Bio must not exceed 180 characters"],
+      default: ""
+    },
     refreshToken: {
       type: String,
     },

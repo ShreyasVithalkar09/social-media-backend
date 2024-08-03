@@ -7,6 +7,7 @@ import {
   uploadToCloudinary,
 } from "../utils/cloudinary.js";
 import mongoose from "mongoose";
+import jwt from "jsonwebtoken";
 
 // generate access and refresh token
 const generateAccessRefreshToken = async (userId) => {
@@ -68,6 +69,7 @@ const getUserProfile = async (userId) => {
         username: 1,
         fullName: 1,
         email: 1,
+        bio: 1,
         "avatar.url": 1,
         postsCount: 1,
         followersCount: 1,
@@ -85,10 +87,12 @@ const getUserProfile = async (userId) => {
 
 // register user
 const registerUser = asyncHandler(async (req, res, next) => {
-  const { username, email, password, fullName } = req.body;
+  const { username, email, password, fullName, bio } = req.body;
 
   if (
-    [username, email, fullName, password].some((field) => field?.trim === "")
+    [username, email, fullName, password, bio].some(
+      (field) => field?.trim === ""
+    )
   ) {
     throw new ApiError(400, "All fields are required!", []);
   }
@@ -120,6 +124,7 @@ const registerUser = asyncHandler(async (req, res, next) => {
     email,
     password,
     fullName,
+    bio,
     avatar: {
       url: avatar?.url || "",
       public_id: avatar?.public_id || "",
@@ -262,9 +267,9 @@ const logoutUser = asyncHandler(async (req, res) => {
 
 // update user profile
 const updateUserProfile = asyncHandler(async (req, res) => {
-  const { username, email, fullName } = req.body;
+  const { username, email, fullName, bio } = req.body;
 
-  if (!(username || email || fullName)) {
+  if (!(username || email || fullName || bio)) {
     throw new ApiError(400, "All fields are required!");
   }
 
@@ -275,6 +280,7 @@ const updateUserProfile = asyncHandler(async (req, res) => {
         username: username?.toLowerCase(),
         email,
         fullName,
+        bio,
       },
     },
     { new: true }
@@ -351,6 +357,67 @@ const removeAvatar = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, user, "Avatar removed successfully!"));
 });
 
+// refresh access token
+const refreshAccessToken = asyncHandler(async (req, res) => {
+  const incomingRefreshToken =
+    req.cookies?.refreshToken || req.body?.refreshToken;
+
+  if (!incomingRefreshToken) {
+    throw new ApiError(401, "Unauthorized request!");
+  }
+
+  try {
+    // decode the token
+    const decoded = jwt.decode(
+      incomingRefreshToken,
+      process.env.REFRESH_TOKEN_SECRET
+    );
+
+    const user = await User.findById(decoded?._id);
+
+    if (!user) {
+      throw new ApiError(404, "User does not exist");
+    }
+
+    // verify the token
+    if (incomingRefreshToken !== user.refreshToken) {
+      throw new ApiError(401, "Refresh token is expired or used");
+    }
+
+    const options = {
+      httpOnly: true,
+      secure: true,
+    };
+
+    const { accessToken, refreshToken } = await generateAccessRefreshToken(
+      user._id
+    );
+
+    return res.status(200)
+    .cookie("accessToken", accessToken, options)
+    .cookie("refreshToken", refreshToken, options)
+    .json(
+      new ApiResponse(
+        200,
+        {
+          accessToken,
+          refreshToken,
+        },
+        "Access token refreshed!"
+      )
+    );
+  } catch (error) {
+    throw new ApiError(401, error?.message || "Invalid Refresh Token");
+  }
+});
+
+
+// Todo: Role based access - P2
+
+// Todo: If user account is deleted, then remove user's posts and comments - P3
+// Todo: delete account - P3
+// Todo: Update password
+
 export {
   registerUser,
   loginUser,
@@ -360,4 +427,5 @@ export {
   updateUserProfile,
   updateAvatar,
   removeAvatar,
+  refreshAccessToken,
 };
