@@ -61,10 +61,10 @@ UserSchema.pre("save", async function (next) {
 
 // set the default avatar if not provided
 UserSchema.pre("save", async function (next) {
-  if (!this.isModified("avatar.url")) return next();
+  if (!this.isModified("avatar")) return next();
 
   if (this.avatar.url === null || this.avatar.url === "") {
-    this.avatar.url = `https://avatar.iran.liara.run/username?username=${this.username}`;
+    this.avatar.url = `https://avatar.iran.liara.run/username?username=${this.fullName}`;
   }
   next();
 });

@@ -6,6 +6,9 @@ import {
   loginUser,
   logoutUser,
   registerUser,
+  removeAvatar,
+  updateAvatar,
+  updateUserProfile,
 } from "../controllers/user.controller.js";
 import { upload } from "../middlewares/multer.middleware.js";
 
@@ -22,5 +25,12 @@ router
   .route("/profile/:username")
   .get(verifyJwtToken, getUserProfileByUsername);
 router.route("/profile/get/me").get(verifyJwtToken, getMyProfile);
+router
+  .route("/profile/me/update-account")
+  .patch(verifyJwtToken, updateUserProfile);
+router
+  .route("/profile/me/avatar")
+  .patch(verifyJwtToken, upload.single("avatar"), updateAvatar)
+  .delete(verifyJwtToken, removeAvatar)
 
 export default router;

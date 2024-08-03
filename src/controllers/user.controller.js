@@ -2,7 +2,10 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { User } from "../models/user.model.js";
-import { uploadToCloudinary } from "../utils/cloudinary.js";
+import {
+  deleteFromCloudinary,
+  uploadToCloudinary,
+} from "../utils/cloudinary.js";
 import mongoose from "mongoose";
 
 // generate access and refresh token
@@ -64,6 +67,7 @@ const getUserProfile = async (userId) => {
         _id: 1,
         username: 1,
         fullName: 1,
+        email: 1,
         "avatar.url": 1,
         postsCount: 1,
         followersCount: 1,
@@ -256,10 +260,104 @@ const logoutUser = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, {}, "User logged Out successfully!"));
 });
 
+// update user profile
+const updateUserProfile = asyncHandler(async (req, res) => {
+  const { username, email, fullName } = req.body;
+
+  if (!(username || email || fullName)) {
+    throw new ApiError(400, "All fields are required!");
+  }
+
+  const user = await User.findByIdAndUpdate(
+    req.user?._id,
+    {
+      $set: {
+        username: username?.toLowerCase(),
+        email,
+        fullName,
+      },
+    },
+    { new: true }
+  ).select("-password -refreshToken");
+
+  if (!user) {
+    throw new ApiError(500, "Something went wrong!");
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, user, "User profile updated successfully!"));
+});
+
+// update avatar
+const updateAvatar = asyncHandler(async (req, res) => {
+  const avatarLocalPath = req.file?.path;
+
+  if (!avatarLocalPath) {
+    throw new ApiError(400, "Avatar is required!", []);
+  }
+
+  const user = await User.findById(req.user?._id).select(
+    "-password -refreshToken"
+  );
+
+  if (!user) {
+    throw new ApiError(404, "User does not exist!", []);
+  }
+
+  const avatar = await uploadToCloudinary(avatarLocalPath, "users");
+
+  if (!avatar) {
+    throw new ApiError(400, "Error while uploading avatar", []);
+  }
+
+  if (avatar) {
+    // delete old avatar after success
+    await deleteFromCloudinary(user?.avatar?.public_id);
+  }
+
+  user.avatar.public_id = avatar.public_id;
+  user.avatar.url = avatar.url;
+  await user.save({ validateBeforeSave: false, new: true });
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, user, "Avatar updated successfully!!"));
+});
+
+// remove avatar
+const removeAvatar = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user?._id).select(
+    "-password -refreshToken"
+  );
+
+  if (!user) {
+    throw new ApiError(404, "User does not exist!", []);
+  }
+
+  const public_id = user.avatar?.public_id;
+  const { result } = await deleteFromCloudinary(public_id);
+
+  if (result !== "ok") {
+    throw new ApiError(500, "Error while deleting the avatar!");
+  }
+
+  user.avatar.url = "";
+  user.avatar.public_id = "";
+  await user.save({ validateBeforeSave: true, new: true });
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, user, "Avatar removed successfully!"));
+});
+
 export {
   registerUser,
   loginUser,
   getUserProfileByUsername,
   logoutUser,
   getMyProfile,
+  updateUserProfile,
+  updateAvatar,
+  removeAvatar,
 };
