@@ -262,6 +262,7 @@ const likePost = asyncHandler(async (req, res) => {
 
   const { postId } = req.params;
   const { flag } = req.body;
+  let likeStatus;
 
   if (!postId) {
     throw new ApiError(400, "PostId is required!");
@@ -273,18 +274,26 @@ const likePost = asyncHandler(async (req, res) => {
   }
 
   if (flag && !post.likes?.includes(req.user._id)) {
-    post.likes.push(req.user._id);
+    post.likes.push(req.user._id); // like
     await post.save({ validateBeforeSave: false, new: true });
+    likeStatus = true;
   } else if (flag && post.likes?.includes(req.user._id)) {
     const index = post.likes.indexOf(req.user._id);
-    post.likes.splice(index, 1);
+    post.likes.splice(index, 1); // unlike
     await post.save({ validateBeforeSave: false, new: true });
+    likeStatus = false;
   }
   //     todo: edge case needs to be handled
 
   return res
     .status(200)
-    .json(new ApiResponse(200, post, "Post updated successfully!"));
+    .json(
+      new ApiResponse(
+        200,
+        post,
+        likeStatus ? "Post liked successfully!" : "Post Un-liked successfully!"
+      )
+    );
 });
 
 export {

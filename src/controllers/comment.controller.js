@@ -137,9 +137,10 @@ const getPostComments = asyncHandler(async (req, res) => {
 });
 
 // like comments
-const likeComments = asyncHandler(async (req, res) => {
+const likeUnlikeComments = asyncHandler(async (req, res) => {
   const { postId, commentId } = req.params;
   const { flag } = req.body;
+  let likeStatus;
 
   if (!commentId) {
     throw new ApiError(400, "CommentId is required!");
@@ -158,15 +159,17 @@ const likeComments = asyncHandler(async (req, res) => {
   if (flag && !comment.likes?.includes(req.user._id)) {
     comment.likes.push(req.user._id);
     await comment.save({ validateBeforeSave: false, new: true });
+    likeStatus = true
   } else if (flag && comment.likes?.includes(req.user?._id)) {
     const index = comment.likes.indexOf(req.user._id);
     comment.likes.splice(index, 1);
     await comment.save({ validateBeforeSave: false, new: true });
+    likeStatus = false
   }
 
   return res
     .status(200)
-    .json(new ApiResponse(200, comment, "Post comment updated successfully!"));
+    .json(new ApiResponse(200, comment, likeStatus? "Comment liked successfully!" : "Comment Un-liked successfully!"));
 });
 
-export { addComment, deleteComment, getPostComments, likeComments };
+export { addComment, deleteComment, getPostComments, likeUnlikeComments };
