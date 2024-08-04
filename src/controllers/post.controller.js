@@ -296,6 +296,46 @@ const likePost = asyncHandler(async (req, res) => {
     );
 });
 
+const getLikes = asyncHandler(async (req, res) => {
+  const { postId } = req.params;
+
+  const post = await Post.findById(postId)
+
+  if(!post) {
+    throw new ApiError(404, "Post not found!");
+  }
+
+  const likesAggregate = await Post.aggregate([
+    {
+      $match: {
+        _id: new mongoose.Types.ObjectId(postId)
+      }
+    },
+    {
+      $lookup: {
+        from: "users",
+        localField: "likes",
+        foreignField: "_id",
+        as: "likeDetails"
+      }
+    },
+    
+    {
+      $project: {
+        _id: 0,
+        "likeDetails.username": 1,
+        "likeDetails.avatar.url": 1
+      }
+    }
+  ])
+
+  const likeDetails = likesAggregate[0];
+
+  return res.status(200).json(
+    new ApiResponse(200, likeDetails, "Likes fetched successfully!")
+  )
+})
+
 export {
   createPost,
   getPosts,
@@ -304,4 +344,5 @@ export {
   updatePost,
   likePost,
   getPostById,
+  getLikes
 };
