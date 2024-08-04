@@ -8,6 +8,8 @@ import {
 } from "../utils/cloudinary.js";
 import mongoose from "mongoose";
 import jwt from "jsonwebtoken";
+import { Post } from "../models/post.model.js";
+import { Comment } from "../models/comment.model.js";
 
 // generate access and refresh token
 const generateAccessRefreshToken = async (userId) => {
@@ -393,30 +395,93 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
       user._id
     );
 
-    return res.status(200)
-    .cookie("accessToken", accessToken, options)
-    .cookie("refreshToken", refreshToken, options)
-    .json(
-      new ApiResponse(
-        200,
-        {
-          accessToken,
-          refreshToken,
-        },
-        "Access token refreshed!"
-      )
-    );
+    return res
+      .status(200)
+      .cookie("accessToken", accessToken, options)
+      .cookie("refreshToken", refreshToken, options)
+      .json(
+        new ApiResponse(
+          200,
+          {
+            accessToken,
+            refreshToken,
+          },
+          "Access token refreshed!"
+        )
+      );
   } catch (error) {
     throw new ApiError(401, error?.message || "Invalid Refresh Token");
   }
 });
 
+// delete account
+const deleteUserAccount = asyncHandler(async (req, res, next) => {
+  // Make this operation as transaction, so if something goes wrong, then changes will be rolled back
+  const session = await mongoose.startSession();
+  session.startTransaction();
 
-// Todo: Role based access - P2
+  try {
+    // find if user exists
+    const user = await User.findById(req.user?._id).session(session);
 
-// Todo: If user account is deleted, then remove user's posts and comments - P3
-// Todo: delete account - P3
-// Todo: Update password
+    if (!user) {
+      await session.abortTransaction();
+      session.endSession();
+      throw new ApiError(404, "User does not exist!", []);
+    }
+
+    // delete all associated posts and comments
+
+    const comments = await Comment.find({ owner: user._id }).session(session);
+
+    for (let comment of comments) {
+      await Post.updateMany(
+        { comments: comment._id },
+        { $pull: { comments: comment._id } },
+        { session }
+      );
+      await Comment.deleteOne({ _id: comment._id }).session(session);
+    }
+
+    await Post.updateMany(
+      { likes: user._id },
+      { $pull: { likes: user._id } },
+      { session }
+    );
+
+    await Post.deleteMany({
+      owner: user._id,
+    }).session(session);
+
+    // also remove this user from followers
+    await User.updateMany(
+      { followers: user._id },
+      { $pull: { followers: user._id } },
+      { session }
+    );
+
+    await User.updateMany(
+      { following: user._id },
+      { $pull: { following: user._id } },
+      { session }
+    );
+
+    // now delete the user
+    const deletedUser = await User.findByIdAndDelete(user._id).session(session);
+    if (deletedUser) {
+      await session.commitTransaction();
+      session.endSession();
+    }
+
+    return res
+      .status(200)
+      .json(new ApiResponse(200, {}, "User account deleted successfully!"));
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    throw new ApiError(500, error?.message || "Something went wrong!", []);
+  }
+});
 
 export {
   registerUser,
@@ -428,4 +493,5 @@ export {
   updateAvatar,
   removeAvatar,
   refreshAccessToken,
+  deleteUserAccount,
 };
